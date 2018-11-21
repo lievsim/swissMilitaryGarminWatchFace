@@ -151,8 +151,6 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     // @desc  : Handles update event
     function onUpdate(dc) {
     
-        var width = dc.getWidth();              // (int)   Screen width
-        var height = dc.getHeight();            // (int)   Screen height
         var clockTime = System.getClockTime();  // (int)   System time
         var minuteHandAngle;                    // (int)   Minute angle
         var hourHandAngle;                      // (int)   Hour angle
@@ -188,7 +186,6 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         
         // Draw the date
         drawDateString(dc, 185, 108);
-        
     }
 
     // @func  : drawDateString
