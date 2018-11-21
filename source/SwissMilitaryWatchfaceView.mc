@@ -119,11 +119,11 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         hourHandAngle = hourHandAngle / (12 * 60.0);
         hourHandAngle = hourHandAngle * Math.PI * 2;
 
-        dc.fillPolygon(generateHandCoordinates(screenCenterPoint, hourHandAngle, 40, 0, 3));
+        dc.fillPolygon(generateHandCoordinates(screenCenterPoint, hourHandAngle, 60, 0, 8));
 
         // Draw the minute hand.
         minuteHandAngle = (clockTime.min / 60.0) * Math.PI * 2;
-        dc.fillPolygon(generateHandCoordinates(screenCenterPoint, minuteHandAngle, 70, 0, 2));
+        dc.fillPolygon(generateHandCoordinates(screenCenterPoint, minuteHandAngle, 80, 0, 6));
         
         // Draw the arbor in the center of the screen.
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_LT_GRAY);

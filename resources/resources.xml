@@ -1,5 +1,12 @@
 <resources>
     <bitmap id="icon" filename="images/icon.png" />
-    <bitmap id="background" filename="images/background.png" dithering="none" />
+    <bitmap id="background" filename="images/background.png" dithering="none">
+        <palette>
+            <color>000000</color>
+            <color>FFFFFF</color>
+            <color>C7D29F</color>
+            <color>C82B3E</color>
+        </palette>
+    </bitmap>
     <string id="appName">swissMilitaryWatchface</string>
 </resources>
