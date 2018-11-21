@@ -1,0 +1,5 @@
+<resources>
+    <bitmap id="icon" filename="images/icon.png" />
+    <bitmap id="background" filename="images/background.png" dithering="none" />
+    <string id="appName">swissMilitaryWatchface</string>
+</resources>

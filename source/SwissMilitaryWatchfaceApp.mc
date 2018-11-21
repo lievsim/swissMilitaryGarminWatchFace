@@ -1,38 +1,55 @@
-//
-// Copyright 2016-2017 by Garmin Ltd. or its subsidiaries.
-// Subject to Garmin SDK License Agreement and Wearables
-// Application Developer Agreement.
-//
+// +--------------------------------------------------------------------------+
+// | Project :    SwissMilitaryWatchface                                      |
+// | Author  :    Simon Lievre (simon.lievre@gmail.com                        |
+// | Licence :    GNU GPLv3                                                   |
+// | Date    :    11/08/2018                                                  |
+// +--------------------------------------------------------------------------+
 
 using Toybox.Application;
+using Toybox.WatchUi;
 using Toybox.Time;
 using Toybox.Communications;
 
-// This is the primary entry point of the application.
-class SwissMilitaryWatchface extends Application.AppBase
+// @class : SwissMilitaryWatchface
+// @desc  :  Model (MVC). Application entry point
+class SwissMilitaryWatchfaceApp extends Application.AppBase
 {
-    var temperature = null;
 
+    // @func  : initialize
+    // @param :
+    // @ret   :
+    // @desc  : Initialize the application
     function initialize() {
         AppBase.initialize();
     }
-
+    
+    // @func  : onStart
+    // @param : (State) application state
+    // @ret   :
+    // @desc  : Handles Start event
     function onStart(state) {
     }
-
+    
+    // @func  : onStop
+    // @param : (State) application state
+    // @ret   :
+    // @desc  : Handles Stop event
     function onStop(state) {
     }
-    // This method runs each time the main application starts.
+    
+    // @func  : getInitialView
+    // @param :
+    // @ret   : (array) SwissMilitaryWatchfaceView
+    // @desc  : Instanciate the view
     function getInitialView() {
-        if( Toybox.WatchUi has :WatchFaceDelegate ) {
-            return [new SwissMilitaryWatchfaceView(), new AnalogDelegate()];
-        } else {
-            return [new SwissMilitaryWatchfaceView()];
-        }
+        return [new SwissMilitaryWatchfaceView()];
     }
 
-    // This method runs when a goal is triggered and the goal view is started.
-    function getGoalView(goal) {
-        return [new SwissMilitaryWatchfaceGoalView(goal)];
+    // @func  : onSettingsChanged
+    // @param : 
+    // @ret   :
+    // @desc  : Handles SettigsChanged event
+    function onSettingsChanged() {
+        WatchUi.requestUpdate();
     }
 }
