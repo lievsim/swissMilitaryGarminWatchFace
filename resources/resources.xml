@@ -3,9 +3,10 @@
     <bitmap id="background" filename="images/background.png" dithering="none">
         <palette>
             <color>000000</color>
-            <color>FFFFFF</color>
+            <color>111111</color>
+            <color>AA0000</color>
             <color>C7D29F</color>
-            <color>C82B3E</color>
+            <color>FFFFFF</color>
         </palette>
     </bitmap>
     <string id="appName">swissMilitaryWatchface</string>
