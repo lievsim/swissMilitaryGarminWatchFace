@@ -14,6 +14,8 @@ using Toybox.Time.Gregorian;
 using Toybox.WatchUi as Ui;
 using Toybox.Application;
 
+var hasPartialUpdate;    // (Boolean) Stores if the device has partial updates or not
+
 // @class : SwissMilitaryWatchfaceView
 // @desc  :  View (MVC). Handles the display
 class SwissMilitaryWatchfaceView extends Ui.WatchFace
@@ -21,14 +23,22 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     
     const TAIL_LENGTH = 30;         // (int) Tail length of the watch hands
     const HOUMIN_HAND_WIDTH = 10;   // (int) Width of the hour and the minute watch hands
-    const SEC_HAND_TAIL_WIDTH = 2;  // (int) Tail width of the second-hand
+    const SEC_HAND_TAIL_WIDTH = 4;  // (int) Tail width of the second-hand
     const SEC_HAND_TIP_WIDTH = 1;   // (int) Tip width of the second-hand
     const ARROW_HEIGHT = 5;         // (int) Arrow height of the hour and minute watch hands
     const PADDING = 2;              // (int) Padding of the hour and minute watch hands
 
     var isAwake;            // (boolean) Used as a flag. Watch awake or not
-    var screenCenterPoint;  // (Array)   Stores the center point ==> [x, y]
+    var center;             // (Array)   Stores the center point ==> [x, y]
     var background;         // (Bitmap)  Watchface bitmap
+    
+    var font;               // (Font) Font used for the background
+    var screenShape;         // (Shape) Rounded or Rectangle
+    var fullRefresh;         // (Boolean) Used as a flag. Performs full screen refresh or not
+    var backBuf;             // (BufferedBitmap) Background buffer
+    var dateBuf;             // (BufferedBitmap) Date buffer
+    var curClip;
+    
 
     // @func  : initialize
     // @param :
@@ -36,6 +46,9 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     // @desc  : Initialize variables for this view
     function initialize() {
         WatchFace.initialize();
+        screenShape = System.getDeviceSettings().screenShape;
+        fullRefresh = true;
+        hasPartialUpdate = (Toybox.WatchUi.WatchFace has :onPartialUpdate);
     }
     
     // @func  : onLayout
@@ -44,11 +57,37 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     // @desc  : Configure the layout of the watchface for this device
     function onLayout(dc) {
         
-        // Draw the background
-        background = Ui.loadResource(Rez.Drawables.background);
+        // Load resources
+        // TODO: - load icons
+        //       - load font
+        
+        // Buffers
+        if(Toybox.Graphics has :BufferedBitmap) {
+        
+            backBuf = new Graphics.BufferedBitmap({
+                :width=>dc.getWidth(),
+                :height=>dc.getHeight(),
+                :palette=> [
+                    Graphics.COLOR_DK_RED,
+                    0xC7D29F,
+                    Graphics.COLOR_BLACK,
+                    Graphics.COLOR_WHITE
+                ]
+            });
+            
+            dateBuf = new Graphics.BufferedBitmap({
+                :width=>dc.getWidth(),
+                :height=>Graphics.getFontHeight(Graphics.FONT_XTINY)
+            });
+            
+        } else {
+            backBuf = null;
+        }
+        
+        curClip = null;
         
         // Stores center
-        screenCenterPoint = [dc.getWidth()/2, dc.getHeight()/2];
+        center = [dc.getWidth()/2, dc.getHeight()/2];
     }
     
     // @func  : transCoords
@@ -64,7 +103,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
             var x = (coords[i][0] * cos) - (coords[i][1] * sin) + 0.5;
             var y = (coords[i][0] * sin) + (coords[i][1] * cos) + 0.5;
 
-            coords[i] = [screenCenterPoint[0] + x, screenCenterPoint[1] + y];
+            coords[i] = [center[0] + x, center[1] + y];
         }
         
         return coords;
@@ -72,7 +111,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
 
     // @func  : drawHouMinHand
     // @param : (DrawContext) dc; (int) angle; (int) handLength
-    // @ret   : 
+    // @ret   : (Array) arrow
     // @desc  : Draw a watch hand (polygon)
     function drawHouMinHand(dc, angle, handLength) {
         
@@ -121,28 +160,111 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         dc.fillPolygon(arrow);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_WHITE);
         dc.fillPolygon(rect);
+        
+        return arrow;
+    }
+    
+    function getSecHandCoords(angle, handLength) {
+    
+        var secHand = [
+            [-SEC_HAND_TAIL_WIDTH/2, TAIL_LENGTH],
+            [-SEC_HAND_TIP_WIDTH/2, -handLength],
+            [SEC_HAND_TIP_WIDTH/2, -handLength],
+            [SEC_HAND_TAIL_WIDTH/2, TAIL_LENGTH]
+        ];
+        return transCoords(secHand, angle);
     }
     
     // @func  : drawSecHand
     // @param : (DrawContext) dc; (int) angle; (int) handLength
     // @ret   : 
     // @desc  : Draw the second-hand (polygon)
-    function drawSecHand(dc, angle, handLength) {
-        
-        // Coordinates
-        var coords = [
-            [-SEC_HAND_TAIL_WIDTH/2, TAIL_LENGTH],
-            [-SEC_HAND_TIP_WIDTH/2, -handLength],
-            [SEC_HAND_TIP_WIDTH/2, -handLength],
-            [SEC_HAND_TAIL_WIDTH/2, TAIL_LENGTH]
-        ];
+    function drawSecHand(dc, angle, handLength) { 
         
         // Transform the coordinates
-        coords = transCoords(coords, angle);
+        var coords = getSecHandCoords(angle, handLength);
 
         // Draw hand
         dc.setColor(Graphics.COLOR_DK_RED, Graphics.COLOR_DK_RED);
         dc.fillPolygon(coords);
+    }
+    
+    function drawRotatedRectangle(dc, p, alpha, width, height) {
+        //  b---------c
+        //  |         | height
+        //  a----p----d
+        //     width
+        
+        var a;
+        var b;
+        var c;
+        var d;
+        var rect;
+        
+        a = [p[0] - width/2 * Math.cos(alpha), p[1] - width/2 * Math.sin(alpha)];
+        b = [a[0] + height * Math.cos(Math.PI/2 + alpha), a[1] + height * Math.sin((Math.PI/2) + alpha)];
+        c = [b[0] + width * Math.cos(alpha), b[1] + width * Math.sin(alpha)];
+        d = [a[0] + width * Math.cos(alpha), a[1] + width * Math.sin(alpha)];
+        
+        rect = [a, b, c, d];
+        dc.setColor(0xC7D29F, 0xC7D29F);
+        dc.fillPolygon(rect);
+        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+        dc.drawLine(a[0], a[1], b[0], b[1]);
+        dc.drawLine(b[0], b[1], c[0], c[1]);
+        dc.drawLine(c[0], c[1], d[0], d[1]);
+        dc.drawLine(d[0], d[1], a[0], a[1]);
+    }
+    
+    
+    // @func  : drawHashMarks
+    // @param : (DrawContext) dc
+    // @ret   : 
+    // @desc  : Draw the hash marks
+    function drawHashMarks(dc) {
+    
+        var width = dc.getWidth();
+        var height = dc.getHeight();
+        var sX;
+        var sY;
+        var eX;
+        var eY;
+
+        // Draw hashmarks differently depending on screen geometry.
+        if (System.SCREEN_SHAPE_ROUND == screenShape) {
+        
+            var r = width/2;
+            var rOut = r - PADDING;
+            var rIn = rOut - 7;
+            
+            // Loop through each 5 minute block and draw tick marks.
+            for (var i = 0; i <= 11 * Math.PI / 6; i += (Math.PI / 6)) {
+                
+                // Draw major ticks (rotated rectangles)
+                var p = [r + rOut * Math.cos(i), r + rOut * Math.sin(i)];
+                drawRotatedRectangle(dc, p, i + (Math.PI/2), 10, 7);
+                
+               // Loop through each minute block within a 5 min block.
+               for (var j=i+(Math.PI / 30); j<i+(Math.PI / 6); j+=(Math.PI / 30)) {
+               
+                   sY = r + rIn * Math.sin(j);
+                   eY = r + rOut * Math.sin(j);
+                   sX = r + rIn * Math.cos(j);
+                   eX = r + rOut * Math.cos(j);
+                   dc.drawLine(sX, sY, eX, eY);
+               }
+            }
+        } else {
+            var coords = [0, width / 4, (3 * width) / 4, width];
+            for (var i = 0; i < coords.size(); i += 1) {
+                var dx = ((width / 2.0) - coords[i]) / (height / 2.0);
+                var upperX = coords[i] + (dx * 10);
+                // Draw the upper hash marks.
+                dc.fillPolygon([[coords[i] - 1, 2], [upperX - 1, 12], [upperX + 1, 12], [coords[i] + 1, 2]]);
+                // Draw the lower hash marks.
+                dc.fillPolygon([[coords[i] - 1, height-2], [upperX - 1, height - 12], [upperX + 1, height - 12], [coords[i] + 1, height - 2]]);
+            }
+        }
     }
 
     // @func  : onUpdate
@@ -156,36 +278,76 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         var hourHandAngle;                      // (int)   Hour angle
         var secondHandAngle;                    // (int)   Second angle
         
-        // Clear the screen
-        dc.clear();
+        var width;
+        var height;
+        var screenWidth = dc.getWidth();
+        var targetDc = null;
+
+        // We always want to refresh the full screen when we get a regular onUpdate call.
+        fullRefresh = true;
+
+        if(null != backBuf) {
+            dc.clearClip();
+            curClip = null;
+            targetDc = backBuf.getDc();
+        } else {
+            targetDc = dc;
+        }
         
-        // Draw the background image
-        dc.drawBitmap(0, 0, background);
+        width = targetDc.getWidth();
+        height = targetDc.getHeight();
+        
+        // Draw the background
+        targetDc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_WHITE);
+        targetDc.fillRectangle(0, 0, dc.getWidth(), dc.getHeight());
+        
+        // Draw hash marks
+        drawHashMarks(targetDc);
         
         // Draw the hour hand. Convert it to minutes and compute the angle.
         hourHandAngle = (((clockTime.hour % 12) * 60) + clockTime.min);
         hourHandAngle = hourHandAngle / (12 * 60.0);
         hourHandAngle = hourHandAngle * Math.PI * 2;
-        drawHouMinHand(dc, hourHandAngle, 70);
+        drawHouMinHand(targetDc, hourHandAngle, 70);
 
         // Draw the minute hand.
         minuteHandAngle = (clockTime.min / 60.0) * Math.PI * 2;
-        drawHouMinHand(dc, minuteHandAngle, 95);
+        drawHouMinHand(targetDc, minuteHandAngle, 95);
         
-        // Draw the second hand if awake
-        if(isAwake){
+        // Draw the arbor in the center of the screen.
+        targetDc.setColor(Graphics.COLOR_DK_RED, Graphics.COLOR_DK_RED);
+        targetDc.fillCircle(center[0], center[1], 6);
+        targetDc.setColor(Graphics.COLOR_BLACK,Graphics.COLOR_BLACK);
+        targetDc.drawCircle(center[0], center[1], 6);
+        
+        // Draw the date
+        if( null != dateBuf ) {
+        
+            var dateDc = dateBuf.getDc();
+
+            //Draw the background image buffer into the date buffer to set the background
+            dateDc.drawBitmap(0, -height/2, backBuf);
+
+            //Draw the date string into the buffer.
+            dateDc.drawRectangle(4*width/5, 0, 20, Graphics.getFontHeight(Graphics.FONT_XTINY));
+            drawDateString(dateDc, 4*width/5,0 );
+        }
+        
+        // Output the offscreen buffers to the main display if required.
+        drawBackground(dc);
+        
+         if( hasPartialUpdate ) {
+            // If this device supports partial updates and they are currently
+            // allowed run the onPartialUpdate method to draw the second hand.
+            onPartialUpdate( dc );
+        } else if ( isAwake ) {
+            // Otherwise, if we are out of sleep mode, draw the second hand
+            // directly in the full update method.
             secondHandAngle = (clockTime.sec / 60.0) * Math.PI * 2;
             drawSecHand(dc, secondHandAngle, 100);
         }
-        
-        // Draw the arbor in the center of the screen.
-        dc.setColor(Graphics.COLOR_DK_RED, Graphics.COLOR_DK_RED);
-        dc.fillCircle(screenCenterPoint[0], screenCenterPoint[1], 5);
-        dc.setColor(Graphics.COLOR_BLACK,Graphics.COLOR_BLACK);
-        dc.drawCircle(screenCenterPoint[0], screenCenterPoint[1], 5);
-        
-        // Draw the date
-        drawDateString(dc, 185, 108);
+
+        fullRefresh = false;
     }
 
     // @func  : drawDateString
@@ -198,6 +360,81 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
 
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x, y, Graphics.FONT_XTINY, dayStr, Graphics.TEXT_JUSTIFY_LEFT);
+    }
+    
+     // Handle the partial update event
+    function onPartialUpdate( dc ) {
+        // If we're not doing a full screen refresh we need to re-draw the background
+        // before drawing the updated second hand position. Note this will only re-draw
+        // the background in the area specified by the previously computed clipping region.
+        if(!fullRefresh) {
+            drawBackground(dc);
+        }
+
+        var clockTime = System.getClockTime();
+        var secAngle = (clockTime.sec / 60.0) * Math.PI * 2;
+        var secHand = getSecHandCoords(secAngle, 100);
+
+        // Update the cliping rectangle to the new location of the second hand.
+        curClip = getBoundingBox( secHand );
+        var bboxWidth = curClip[1][0] - curClip[0][0] + 1;
+        var bboxHeight = curClip[1][1] - curClip[0][1] + 1;
+        dc.setClip(curClip[0][0], curClip[0][1], bboxWidth, bboxHeight);
+        
+        dc.setColor(Graphics.COLOR_DK_RED, Graphics.COLOR_DK_RED);
+        dc.fillPolygon(secHand);
+    }
+
+    // Compute a bounding box from the passed in points
+    function getBoundingBox( points ) {
+        var min = [9999,9999];
+        var max = [0,0];
+
+        for (var i = 0; i < points.size(); ++i) {
+            if(points[i][0] < min[0]) {
+                min[0] = points[i][0];
+            }
+
+            if(points[i][1] < min[1]) {
+                min[1] = points[i][1];
+            }
+
+            if(points[i][0] > max[0]) {
+                max[0] = points[i][0];
+            }
+
+            if(points[i][1] > max[1]) {
+                max[1] = points[i][1];
+            }
+        }
+
+        return [min, max];
+    }
+
+    // Draw the watch face background
+    // onUpdate uses this method to transfer newly rendered Buffered Bitmaps
+    // to the main display.
+    // onPartialUpdate uses this to blank the second hand from the previous
+    // second before outputing the new one.
+    function drawBackground(dc) {
+        var width = dc.getWidth();
+        var height = dc.getHeight();
+
+        //If we have an offscreen buffer that has been written to
+        //draw it to the screen.
+        if( null != backBuf ) {
+            dc.drawBitmap(0, 0, backBuf);
+        }
+
+        // Draw the date
+        if( null != dateBuf ) {
+            // If the date is saved in a Buffered Bitmap, just copy it from there.
+            dc.drawBitmap(0, height/2, dateBuf);
+        } else {
+            // Otherwise, draw it from scratch.
+            dc.drawRectangle(4*width/5, 0, 25, Graphics.getFontHeight(Graphics.FONT_XTINY));
+            drawDateString(dc, 4*width/5, height/2 );
+        }
     }
 
     // @func  : onEnterSleep
