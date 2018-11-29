@@ -31,14 +31,14 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     var isAwake;            // (boolean) Used as a flag. Watch awake or not
     var center;             // (Array)   Stores the center point ==> [x, y]
     var background;         // (Bitmap)  Watchface bitmap
-    
-    var font;               // (Font) Font used for the background
-    var screenShape;         // (Shape) Rounded or Rectangle
-    var fullRefresh;         // (Boolean) Used as a flag. Performs full screen refresh or not
-    var backBuf;             // (BufferedBitmap) Background buffer
-    var dateBuf;             // (BufferedBitmap) Date buffer
-    var curClip;
-    
+    var logo;               // (Bitmap)  Logo bitmap
+    var fontIn;             // (Font) Font used for the numbers
+    var fontOut;            // (Font) Font used for the numbers
+    var screenShape;        // (Shape) Rounded or Rectangle
+    var fullRefresh;        // (Boolean) Used as a flag. Performs full screen refresh or not
+    var backBuf;            // (BufferedBitmap) Background buffer
+    var dateBuf;            // (BufferedBitmap) Date buffer
+    var curClip;            // /?) Used to clip the area to refresh
 
     // @func  : initialize
     // @param :
@@ -58,8 +58,9 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     function onLayout(dc) {
         
         // Load resources
-        // TODO: - load icons
-        //       - load font
+        logo = Ui.loadResource(Rez.Drawables.logo);
+        fontIn = Ui.loadResource(Rez.Fonts.smInside);
+        fontOut = Ui.loadResource(Rez.Fonts.smBorder);
         
         // Buffers
         if(Toybox.Graphics has :BufferedBitmap) {
@@ -69,7 +70,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
                 :height=>dc.getHeight(),
                 :palette=> [
                     Graphics.COLOR_DK_RED,
-                    0xC7D29F,
+                    0xC7DDA6,
                     Graphics.COLOR_BLACK,
                     Graphics.COLOR_WHITE
                 ]
@@ -77,7 +78,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
             
             dateBuf = new Graphics.BufferedBitmap({
                 :width=>dc.getWidth(),
-                :height=>Graphics.getFontHeight(Graphics.FONT_XTINY)
+                :height=>Graphics.getFontHeight(Graphics.FONT_XTINY)+2*PADDING
             });
             
         } else {
@@ -85,6 +86,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         }
         
         curClip = null;
+        isAwake = false;
         
         // Stores center
         center = [dc.getWidth()/2, dc.getHeight()/2];
@@ -158,12 +160,16 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         // Draw hand
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.fillPolygon(arrow);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_WHITE);
+        dc.setColor(0xC7DDA6, 0xC7DDA6);
         dc.fillPolygon(rect);
         
         return arrow;
     }
     
+    // @func  : getSecHandCoords
+    // @param : (int) angle; (int) handLength
+    // @ret   : (Array) coords
+    // @desc  : return the second hand coordinates
     function getSecHandCoords(angle, handLength) {
     
         var secHand = [
@@ -189,6 +195,10 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         dc.fillPolygon(coords);
     }
     
+    // @func  : drawRotatedRectangle
+    // @param : (DrawContext) dc; (Array) p; (int) alpha; (int) width; (int) height
+    // @ret   : 
+    // @desc  : Draw a rectangle rotated rotated by alpha radians (polygon)
     function drawRotatedRectangle(dc, p, alpha, width, height) {
         //  b---------c
         //  |         | height
@@ -207,7 +217,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         d = [a[0] + width * Math.cos(alpha), a[1] + width * Math.sin(alpha)];
         
         rect = [a, b, c, d];
-        dc.setColor(0xC7D29F, 0xC7D29F);
+        dc.setColor(0xC7DDA6, 0xC7DDA6);
         dc.fillPolygon(rect);
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.drawLine(a[0], a[1], b[0], b[1]);
@@ -216,6 +226,43 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         dc.drawLine(d[0], d[1], a[0], a[1]);
     }
     
+    // @func  : drawNumbers
+    // @param : (DrawContext) dc
+    // @ret   : 
+    // @desc  : Draw the hour numbers
+    function drawNumbers(dc) {
+    
+        var width = dc.getWidth();
+        var height = dc.getHeight();
+        
+        // Draw numbers differently depending on screen geometry.
+        if (System.SCREEN_SHAPE_ROUND == screenShape) {
+        
+            var r = width/2;
+            var rOut = r - PADDING;
+            var rIn = rOut - 30;
+            var rInIn = rIn - 30;
+            
+            // Loop through each 5 minute block and draw tick marks.
+            for (var i = 0; i < 12; i++) {
+            
+                var alpha = i * (Math.PI/6);
+                
+                if(i != 9){
+                    
+                    dc.setColor(0xC7DDA6, Graphics.COLOR_TRANSPARENT);
+                    dc.drawText(r + rIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+3)%12, fontIn)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontIn)/2, fontIn, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
+                    dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
+                    dc.drawText(r + rIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+3)%12, fontOut)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontOut)/2 , fontOut, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
+                    
+                    //dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+                    //dc.drawText(r + rInIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+15)%24, fontOut)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontOut)/2 , fontOut, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
+                }
+            }
+        }else{
+        
+        }
+    }
     
     // @func  : drawHashMarks
     // @param : (DrawContext) dc
@@ -273,15 +320,13 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     // @desc  : Handles update event
     function onUpdate(dc) {
     
-        var clockTime = System.getClockTime();  // (int)   System time
-        var minuteHandAngle;                    // (int)   Minute angle
-        var hourHandAngle;                      // (int)   Hour angle
-        var secondHandAngle;                    // (int)   Second angle
-        
-        var width;
-        var height;
-        var screenWidth = dc.getWidth();
-        var targetDc = null;
+        var clockTime = System.getClockTime();  // (int) System time
+        var minuteHandAngle;                    // (int) Minute angle
+        var hourHandAngle;                      // (int) Hour angle
+        var secondHandAngle;                    // (int) Second angle
+        var width;                              // (int) Screen width
+        var height;                             // (int) Screen height
+        var targetDc = null;                    // (DrawContext) Where to draw the elements
 
         // We always want to refresh the full screen when we get a regular onUpdate call.
         fullRefresh = true;
@@ -300,9 +345,11 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         // Draw the background
         targetDc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_WHITE);
         targetDc.fillRectangle(0, 0, dc.getWidth(), dc.getHeight());
+        targetDc.drawBitmap(width/2-(logo.getWidth()/2), 0.15*height-(logo.getHeight()/2), logo);
         
         // Draw hash marks
         drawHashMarks(targetDc);
+        drawNumbers(targetDc);
         
         // Draw the hour hand. Convert it to minutes and compute the angle.
         hourHandAngle = (((clockTime.hour % 12) * 60) + clockTime.min);
@@ -329,8 +376,8 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
             dateDc.drawBitmap(0, -height/2, backBuf);
 
             //Draw the date string into the buffer.
-            dateDc.drawRectangle(4*width/5, 0, 20, Graphics.getFontHeight(Graphics.FONT_XTINY));
-            drawDateString(dateDc, 4*width/5,0 );
+            dateDc.drawRectangle(2*width/3, 0, 20+PADDING, Graphics.getFontHeight(Graphics.FONT_XTINY)+PADDING);
+            drawDateString(dateDc, 2*width/3+PADDING, 0);
         }
         
         // Output the offscreen buffers to the main display if required.
@@ -432,8 +479,8 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
             dc.drawBitmap(0, height/2, dateBuf);
         } else {
             // Otherwise, draw it from scratch.
-            dc.drawRectangle(4*width/5, 0, 25, Graphics.getFontHeight(Graphics.FONT_XTINY));
-            drawDateString(dc, 4*width/5, height/2 );
+            dc.drawRectangle(2*width/3, height/2, 20+PADDING, Graphics.getFontHeight(Graphics.FONT_XTINY)+PADDING);
+            drawDateString(dc, 2*width/3+PADDING, height/2);
         }
     }
 

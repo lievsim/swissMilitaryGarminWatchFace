@@ -5,9 +5,18 @@
             <color>000000</color>
             <color>111111</color>
             <color>AA0000</color>
-            <color>C7D29F</color>
+            <color>C7DDA6</color>
+            <color>FFFFFF</color>
+        </palette>
+    </bitmap>
+    <bitmap id="logo" filename="images/logo24x24.png" dithering="none">
+        <palette>
+            <color>000000</color>
+            <color>AA0000</color>
             <color>FFFFFF</color>
         </palette>
     </bitmap>
     <string id="appName">swissMilitaryWatchface</string>
+    <font id="smInside" filename="fonts/smInside.fnt" filter="0123456789" />
+    <font id="smBorder" filename="fonts/smBorder.fnt" filter="0123456789" />
 </resources>
