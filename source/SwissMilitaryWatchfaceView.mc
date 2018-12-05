@@ -32,9 +32,9 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     var center;             // (Array)   Stores the center point ==> [x, y]
     var background;         // (Bitmap)  Watchface bitmap
     var logo;               // (Bitmap)  Logo bitmap
+    var military;           // (Bitmap)  Logo military
     var fontIn;             // (Font) Font used for the numbers
     var fontOut;            // (Font) Font used for the numbers
-    var screenShape;        // (Shape) Rounded or Rectangle
     var fullRefresh;        // (Boolean) Used as a flag. Performs full screen refresh or not
     var backBuf;            // (BufferedBitmap) Background buffer
     var dateBuf;            // (BufferedBitmap) Date buffer
@@ -46,7 +46,6 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
     // @desc  : Initialize variables for this view
     function initialize() {
         WatchFace.initialize();
-        screenShape = System.getDeviceSettings().screenShape;
         fullRefresh = true;
         hasPartialUpdate = (Toybox.WatchUi.WatchFace has :onPartialUpdate);
     }
@@ -59,6 +58,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         
         // Load resources
         logo = Ui.loadResource(Rez.Drawables.logo);
+        military = Ui.loadResource(Rez.Drawables.military);
         fontIn = Ui.loadResource(Rez.Fonts.smInside);
         fontOut = Ui.loadResource(Rez.Fonts.smBorder);
         
@@ -235,32 +235,26 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         var width = dc.getWidth();
         var height = dc.getHeight();
         
-        // Draw numbers differently depending on screen geometry.
-        if (System.SCREEN_SHAPE_ROUND == screenShape) {
+        var r = width/2;
+        var rOut = r - PADDING;
+        var rIn = rOut - 30;
+        var rInIn = rIn - 30;
         
-            var r = width/2;
-            var rOut = r - PADDING;
-            var rIn = rOut - 30;
-            var rInIn = rIn - 30;
+        // Loop through each 5 minute block and draw tick marks.
+        for (var i = 0; i < 12; i++) {
+        
+            var alpha = i * (Math.PI/6);
             
-            // Loop through each 5 minute block and draw tick marks.
-            for (var i = 0; i < 12; i++) {
-            
-                var alpha = i * (Math.PI/6);
+            if(i != 9){
                 
-                if(i != 9){
-                    
-                    dc.setColor(0xC7DDA6, Graphics.COLOR_TRANSPARENT);
-                    dc.drawText(r + rIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+3)%12, fontIn)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontIn)/2, fontIn, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
-                    dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
-                    dc.drawText(r + rIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+3)%12, fontOut)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontOut)/2 , fontOut, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
-                    
-                    //dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-                    //dc.drawText(r + rInIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+15)%24, fontOut)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontOut)/2 , fontOut, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
-                }
+                dc.setColor(0xC7DDA6, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(r + rIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+3)%12, fontIn)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontIn)/2, fontIn, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
+                dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(r + rIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+3)%12, fontOut)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontOut)/2 , fontOut, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
+                
+                //dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+                //dc.drawText(r + rInIn * Math.cos(alpha)-dc.getTextWidthInPixels(""+(i+15)%24, fontOut)/2, r + rIn * Math.sin(alpha)-Graphics.getFontHeight(fontOut)/2 , fontOut, (i+3)%12, Graphics.TEXT_JUSTIFY_LEFT);
             }
-        }else{
-        
         }
     }
     
@@ -276,41 +270,27 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         var sY;
         var eX;
         var eY;
-
-        // Draw hashmarks differently depending on screen geometry.
-        if (System.SCREEN_SHAPE_ROUND == screenShape) {
         
-            var r = width/2;
-            var rOut = r - PADDING;
-            var rIn = rOut - 7;
+        var r = width/2;
+        var rOut = r - PADDING;
+        var rIn = rOut - 7;
+        
+        // Loop through each 5 minute block and draw tick marks.
+        for (var i = 0; i <= 11 * Math.PI / 6; i += (Math.PI / 6)) {
             
-            // Loop through each 5 minute block and draw tick marks.
-            for (var i = 0; i <= 11 * Math.PI / 6; i += (Math.PI / 6)) {
-                
-                // Draw major ticks (rotated rectangles)
-                var p = [r + rOut * Math.cos(i), r + rOut * Math.sin(i)];
-                drawRotatedRectangle(dc, p, i + (Math.PI/2), 10, 7);
-                
-               // Loop through each minute block within a 5 min block.
-               for (var j=i+(Math.PI / 30); j<i+(Math.PI / 6); j+=(Math.PI / 30)) {
-               
-                   sY = r + rIn * Math.sin(j);
-                   eY = r + rOut * Math.sin(j);
-                   sX = r + rIn * Math.cos(j);
-                   eX = r + rOut * Math.cos(j);
-                   dc.drawLine(sX, sY, eX, eY);
-               }
-            }
-        } else {
-            var coords = [0, width / 4, (3 * width) / 4, width];
-            for (var i = 0; i < coords.size(); i += 1) {
-                var dx = ((width / 2.0) - coords[i]) / (height / 2.0);
-                var upperX = coords[i] + (dx * 10);
-                // Draw the upper hash marks.
-                dc.fillPolygon([[coords[i] - 1, 2], [upperX - 1, 12], [upperX + 1, 12], [coords[i] + 1, 2]]);
-                // Draw the lower hash marks.
-                dc.fillPolygon([[coords[i] - 1, height-2], [upperX - 1, height - 12], [upperX + 1, height - 12], [coords[i] + 1, height - 2]]);
-            }
+            // Draw major ticks (rotated rectangles)
+            var p = [r + rOut * Math.cos(i), r + rOut * Math.sin(i)];
+            drawRotatedRectangle(dc, p, i + (Math.PI/2), 10, 7);
+            
+           // Loop through each minute block within a 5 min block.
+           for (var j=i+(Math.PI / 30); j<i+(Math.PI / 6); j+=(Math.PI / 30)) {
+           
+               sY = r + rIn * Math.sin(j);
+               eY = r + rOut * Math.sin(j);
+               sX = r + rIn * Math.cos(j);
+               eX = r + rOut * Math.cos(j);
+               dc.drawLine(sX, sY, eX, eY);
+           }
         }
     }
 
@@ -346,6 +326,7 @@ class SwissMilitaryWatchfaceView extends Ui.WatchFace
         targetDc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_WHITE);
         targetDc.fillRectangle(0, 0, dc.getWidth(), dc.getHeight());
         targetDc.drawBitmap(width/2-(logo.getWidth()/2), 0.15*height-(logo.getHeight()/2), logo);
+        targetDc.drawBitmap(width/2-(military.getWidth()/2), 0.35*height-(military.getHeight()/2), military);
         
         // Draw hash marks
         drawHashMarks(targetDc);

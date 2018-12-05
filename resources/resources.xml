@@ -16,6 +16,12 @@
             <color>FFFFFF</color>
         </palette>
     </bitmap>
+    <bitmap id="military" filename="images/military.png" dithering="none">
+        <palette>
+            <color>000000</color>
+            <color>FFFFFF</color>
+        </palette>
+    </bitmap>
     <string id="appName">swissMilitaryWatchface</string>
     <font id="smInside" filename="fonts/smInside.fnt" filter="0123456789" />
     <font id="smBorder" filename="fonts/smBorder.fnt" filter="0123456789" />
